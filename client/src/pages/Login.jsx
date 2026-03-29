@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { api, setTokens } from '../services/api.js';
 import './Auth.css';
 
 /**
@@ -28,29 +29,16 @@ export function Login() {
     setError(null);
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error?.message || 'Login failed');
-      }
+      const data = await api.post('/auth/login', formData);
 
       // Store tokens
-      localStorage.setItem('accessToken', data.data.tokens.accessToken);
-      localStorage.setItem('refreshToken', data.data.tokens.refreshToken);
-      localStorage.setItem('user', JSON.stringify(data.data.user));
+      setTokens(data.data.tokens.accessToken, data.data.tokens.refreshToken);
+      localStorage.setItem('user_data', JSON.stringify(data.data.user));
 
       // Redirect to dashboard
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
     }

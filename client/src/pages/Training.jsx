@@ -3,11 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { ScenarioCard } from '../components/ScenarioCard';
 import { FeedbackPanel } from '../components/FeedbackPanel';
 import { getRandomScenario, submitScenarioAnswer } from '../services/scenarioService.js';
+import { api, isAuthenticated } from '../services/api.js';
 import './Training.css';
 
 /**
  * Training Page Component
- * Interactive scenario training with feedback (static version)
+ * Interactive scenario training with AI-powered recommendations and feedback
  */
 export function Training() {
   const [searchParams] = useSearchParams();
@@ -15,17 +16,47 @@ export function Training() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [recommendation, setRecommendation] = useState(null);
+  const [aiFeedback, setAiFeedback] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const filterType = searchParams.get('type');
+
+  // Fetch AI recommendation on mount (if authenticated)
+  useEffect(() => {
+    if (isAuthenticated() && !filterType) {
+      fetchAiRecommendation();
+    }
+  }, []);
+
+  // Fetch AI recommendation
+  const fetchAiRecommendation = async () => {
+    if (!isAuthenticated()) return;
+    
+    try {
+      const response = await api.post('/ai/recommend', {});
+      setRecommendation(response.data.data);
+    } catch (err) {
+      console.warn('Failed to get AI recommendation:', err.message);
+    }
+  };
 
   // Fetch next scenario
   const fetchNextScenario = async () => {
     setLoading(true);
     setError(null);
     setResult(null);
+    setAiFeedback(null);
 
     try {
-      const scenarioData = await getRandomScenario(filterType);
+      // Use AI recommendation if available
+      const recType = recommendation?.recommendedType;
+      const recDifficulty = recommendation?.recommendedDifficulty;
+      
+      const scenarioData = await getRandomScenario(
+        filterType || recType,
+        recDifficulty
+      );
       setScenario(scenarioData);
     } catch (err) {
       setError(err.message);
@@ -37,20 +68,43 @@ export function Training() {
   // Load scenario on mount
   useEffect(() => {
     fetchNextScenario();
-  }, [filterType]);
+  }, [filterType, recommendation]);
+
+  // Fetch AI feedback after submission
+  const fetchAiFeedback = async (scenarioId, isCorrect) => {
+    if (!isAuthenticated()) return;
+    
+    setAiLoading(true);
+    try {
+      const response = await api.post('/ai/feedback', {
+        scenarioId,
+        isCorrect
+      });
+      setAiFeedback(response.data.data);
+    } catch (err) {
+      console.warn('Failed to get AI feedback:', err.message);
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   // Handle scenario submission
   const handleSubmit = async (selectedOptionIds, timeSpentSeconds) => {
     setLoading(true);
 
     try {
-      const result = await submitScenarioAnswer(
-        scenario.scenarioId,
+      const submitResult = await submitScenarioAnswer(
+        scenario.id || scenario.scenarioId,
         selectedOptionIds,
         timeSpentSeconds
       );
 
-      setResult(result.evaluation);
+      setResult(submitResult);
+      
+      // Fetch AI feedback for authenticated users
+      if (isAuthenticated()) {
+        fetchAiFeedback(scenario.id || scenario.scenarioId, submitResult.isCorrect);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -72,6 +126,7 @@ export function Training() {
   // Handle retry (show scenario again)
   const handleRetry = () => {
     setResult(null);
+    setAiFeedback(null);
   };
 
   if (loading && !scenario) {
@@ -109,12 +164,19 @@ export function Training() {
             Module: {filterType.replace('_', ' ')}
           </span>
         )}
+        {recommendation?.aiPowered && (
+          <span className="ai-badge" title={recommendation.reasoning}>
+            🤖 AI Recommended
+          </span>
+        )}
       </header>
 
       <div className="training-content">
         {result ? (
           <FeedbackPanel
             result={result}
+            aiFeedback={aiFeedback}
+            aiLoading={aiLoading}
             onNext={handleNext}
             onRetry={handleRetry}
           />

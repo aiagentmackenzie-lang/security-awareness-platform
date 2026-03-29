@@ -1,6 +1,6 @@
 /**
  * Security Awareness Platform - Main Server
- * Express.js API with security hardening
+ * Express.js API with PostgreSQL and security hardening
  */
 
 const express = require('express');
@@ -88,47 +88,23 @@ app.get('/api/health', (req, res) => {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       environment: NODE_ENV,
-      version: '1.0.0'
+      version: '1.0.0',
+      database: 'PostgreSQL'
     }
   });
 });
 
 // Import routes
-const scenarioRoutes = require('./routes/scenarios');
-const eventsRoutes = require('./routes/events');
-const analyticsRoutes = require('./routes/analytics');
-const dashboardRoutes = require('./routes/dashboard');
-const authRoutes = require('./routes/auth');
-// const userRoutes = require('./routes/users');
+const authRoutes = require('./routes/auth.js');
+const scenarioRoutes = require('./routes/scenarios.js');
+const dashboardRoutes = require('./routes/dashboard.js');
+const aiRoutes = require('./routes/ai.js');
 
-app.use('/api/scenarios', scenarioRoutes);
-app.use('/api/events', eventsRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/dashboard', dashboardRoutes);
+// Wire routes
 app.use('/api/auth', authLimiter, authRoutes);
-// app.use('/api/users', userRoutes);
-
-// Placeholder routes for Phase 1
-app.get('/api/scenarios/next', (req, res) => {
-  res.json({
-    success: true,
-    data: {
-      message: 'Scenario endpoint placeholder - Phase 2 implementation',
-      timestamp: new Date().toISOString()
-    }
-  });
-});
-
-app.post('/api/scenarios/:id/submit', (req, res) => {
-  res.json({
-    success: true,
-    data: {
-      message: 'Submit endpoint placeholder - Phase 2 implementation',
-      scenarioId: req.params.id,
-      timestamp: new Date().toISOString()
-    }
-  });
-});
+app.use('/api/scenarios', scenarioRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/ai', aiRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -166,6 +142,7 @@ app.listen(PORT, () => {
   console.log(`Environment: ${NODE_ENV}`);
   console.log(`Port: ${PORT}`);
   console.log(`Client URL: ${CLIENT_URL}`);
+  console.log(`Database: PostgreSQL`);
   console.log(`Health Check: http://localhost:${PORT}/api/health`);
   console.log('='.repeat(50));
 });

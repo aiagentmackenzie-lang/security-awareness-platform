@@ -3,26 +3,12 @@ import './FeedbackPanel.css';
 
 /**
  * FeedbackPanel Component
- * Displays evaluation results and learning recommendations
+ * Displays evaluation results with AI-generated personalized feedback
  */
-export function FeedbackPanel({ result, onNext, onRetry }) {
+export function FeedbackPanel({ result, aiFeedback, aiLoading, onNext, onRetry }) {
   if (!result) return null;
 
-  const { correct, severity, explanation, scoreDelta, riskCategory, recommendedLearning } = result;
-
-  // Get severity icon and color
-  const getSeverityStyles = (sev) => {
-    switch (sev) {
-      case 'high':
-        return { icon: '🔴', color: 'var(--color-danger)', label: 'High Risk' };
-      case 'medium':
-        return { icon: '🟡', color: 'var(--color-warning)', label: 'Medium Risk' };
-      default:
-        return { icon: '🟢', color: 'var(--color-success)', label: 'Low Risk' };
-    }
-  };
-
-  const severityStyle = getSeverityStyles(severity);
+  const { isCorrect, correctOptions, explanation, scoreDelta } = result;
 
   // Get category icon
   const getCategoryIcon = (type) => {
@@ -41,17 +27,17 @@ export function FeedbackPanel({ result, onNext, onRetry }) {
   };
 
   return (
-    <div className={`feedback-panel ${correct ? 'correct' : 'incorrect'}`}>
+    <div className={`feedback-panel ${isCorrect ? 'correct' : 'incorrect'}`}>
       {/* Result Header */}
       <div className="feedback-header">
         <div className="result-status">
-          <span className="status-icon">{correct ? '✅' : '❌'}</span>
-          <h3 className="status-text">{correct ? 'Correct!' : 'Not Quite'}</h3>
+          <span className="status-icon">{isCorrect ? '✅' : '❌'}</span>
+          <h3 className="status-text">{isCorrect ? 'Correct!' : 'Not Quite'}</h3>
         </div>
-
-        {!correct && (
-          <div className="risk-badge" style={{ background: severityStyle.color }}>
-            {severityStyle.icon} {severityStyle.label}
+        
+        {aiFeedback?.aiPowered && (
+          <div className="ai-badge">
+            🤖 AI Powered
           </div>
         )}
       </div>
@@ -64,39 +50,63 @@ export function FeedbackPanel({ result, onNext, onRetry }) {
         <span className="score-label"> points</span>
       </div>
 
-      {/* Explanation */}
-      <div className="feedback-section">
-        <h4>💡 Key Learning</h4>
-        <p className="explanation-text">{explanation}</p>
-      </div>
+      {/* AI Feedback (if available) */}
+      {aiLoading && (
+        <div className="ai-loading">
+          <span className="ai-spinner">🤖</span>
+          <span>Generating personalized feedback...</span>
+        </div>
+      )}
 
-      {/* Category Info */}
-      <div className="category-info">
-        <span className="category-icon">{getCategoryIcon(riskCategory)}</span>
-        <span className="category-name">{riskCategory.replace('_', ' ')}</span>
-      </div>
+      {aiFeedback && (
+        <div className="ai-feedback-section">
+          <div className="ai-feedback-praise">
+            {aiFeedback.praise}
+          </div>
+          
+          <div className="feedback-section">
+            <h4>💡 Key Lesson</h4>
+            <p className="explanation-text">{aiFeedback.keyLesson || explanation}</p>
+          </div>
+          
+          <div className="feedback-section">
+            <h4>🎯 Practical Tip</h4>
+            <p className="tip-text">{aiFeedback.practicalTip}</p>
+          </div>
+          
+          {aiFeedback.relatedConcept && (
+            <div className="feedback-section related-concept">
+              <h4>🔗 Related Concept</h4>
+              <p>{aiFeedback.relatedConcept}</p>
+            </div>
+          )}
+          
+          {aiFeedback.nextSteps && (
+            <div className="feedback-section next-steps">
+              <h4>👣 Next Steps</h4>
+              <p>{aiFeedback.nextSteps}</p>
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* Micro Learning */}
-      {!correct && recommendedLearning && (
-        <div className="micro-learning">
-          <h4>📚 {recommendedLearning.title}</h4>
-          <ul className="tips-list">
-            {recommendedLearning.relevantTips.map((tip, index) => (
-              <li key={index}>{tip}</li>
-            ))}
-          </ul>
+      {/* Standard feedback (if no AI feedback) */}
+      {!aiFeedback && !aiLoading && (
+        <div className="feedback-section">
+          <h4>💡 Key Learning</h4>
+          <p className="explanation-text">{explanation}</p>
         </div>
       )}
 
       {/* Actions */}
       <div className="feedback-actions">
-        {onRetry && !correct && (
+        {onRetry && !isCorrect && (
           <button className="btn-secondary" onClick={onRetry}>
             Try Again
           </button>
         )}
         <button className="btn-primary" onClick={onNext}>
-          {correct ? 'Next Scenario →' : 'Continue →'}
+          {isCorrect ? 'Next Scenario →' : 'Continue →'}
         </button>
       </div>
     </div>
@@ -105,16 +115,19 @@ export function FeedbackPanel({ result, onNext, onRetry }) {
 
 FeedbackPanel.propTypes = {
   result: PropTypes.shape({
-    correct: PropTypes.bool.isRequired,
-    severity: PropTypes.string,
-    explanation: PropTypes.string.isRequired,
+    isCorrect: PropTypes.bool.isRequired,
     scoreDelta: PropTypes.number.isRequired,
-    riskCategory: PropTypes.string.isRequired,
-    recommendedLearning: PropTypes.shape({
-      title: PropTypes.string.isRequired,
-      relevantTips: PropTypes.arrayOf(PropTypes.string).isRequired
-    })
+    explanation: PropTypes.string.isRequired
   }),
+  aiFeedback: PropTypes.shape({
+    aiPowered: PropTypes.bool,
+    praise: PropTypes.string,
+    keyLesson: PropTypes.string,
+    practicalTip: PropTypes.string,
+    relatedConcept: PropTypes.string,
+    nextSteps: PropTypes.string
+  }),
+  aiLoading: PropTypes.bool,
   onNext: PropTypes.func.isRequired,
   onRetry: PropTypes.func
 };

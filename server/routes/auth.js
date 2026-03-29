@@ -1,20 +1,19 @@
 /**
  * Security Awareness Platform - API Routes: Authentication
- * JWT-based auth with secure session management
+ * JWT-based auth with PostgreSQL database
  */
 
 const express = require('express');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
+const { createUser, getUserByEmail, verifyPassword, getUserById } = require('../db/users.js');
 
-// JWT Configuration
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+// JWT Configuration from environment
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production-64-characters-long';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
-// Mock user store - replace with database in production
-const users = new Map();
+// In-memory refresh token store (use Redis in production)
 const refreshTokens = new Map();
 
 /**
@@ -60,42 +59,12 @@ router.post('/register',
     try {
       const { email, password, displayName } = req.body;
 
-      // Check if user already exists
-      if (users.has(email)) {
-        return res.status(409).json({
-          success: false,
-          error: {
-            code: 'USER_EXISTS',
-            message: 'An account with this email already exists'
-          }
-        });
-      }
-
-      // Hash password
-      const saltRounds = 12;
-      const passwordHash = await bcrypt.hash(password, saltRounds);
-
-      // Create user
-      const userId = `user-${Date.now()}`;
-      const user = {
-        id: userId,
-        email,
-        displayName,
-        passwordHash,
-        role: 'learner',
-        isActive: true,
-        totalScore: 0,
-        riskScore: 50,
-        currentStreak: 0,
-        longestStreak: 0,
-        createdAt: new Date().toISOString()
-      };
-
-      users.set(email, user);
+      // Create user in database
+      const user = await createUser({ email, password, displayName, role: 'learner' });
 
       // Generate tokens
-      const { accessToken, refreshToken } = generateTokens(userId, email);
-      refreshTokens.set(refreshToken, userId);
+      const { accessToken, refreshToken } = generateTokens(user.id, user.email);
+      refreshTokens.set(refreshToken, user.id);
 
       res.status(201).json({
         success: true,
@@ -103,12 +72,12 @@ router.post('/register',
           user: {
             id: user.id,
             email: user.email,
-            displayName: user.displayName,
+            displayName: user.display_name,
             role: user.role,
-            totalScore: user.totalScore,
-            riskScore: user.riskScore,
-            currentStreak: user.currentStreak,
-            longestStreak: user.longestStreak
+            totalScore: 0,
+            riskScore: 0,
+            currentStreak: 0,
+            longestStreak: 0
           },
           tokens: {
             accessToken,
@@ -118,6 +87,16 @@ router.post('/register',
         }
       });
     } catch (error) {
+      if (error.code === 'DUPLICATE_EMAIL') {
+        return res.status(409).json({
+          success: false,
+          error: {
+            code: 'USER_EXISTS',
+            message: 'An account with this email already exists'
+          }
+        });
+      }
+      
       console.error('Registration error:', error);
       res.status(500).json({
         success: false,
@@ -153,8 +132,8 @@ router.post('/login',
     try {
       const { email, password } = req.body;
 
-      // Find user
-      const user = users.get(email);
+      // Find user in database
+      const user = await getUserByEmail(email);
       if (!user) {
         return res.status(401).json({
           success: false,
@@ -166,7 +145,7 @@ router.post('/login',
       }
 
       // Check if account is active
-      if (!user.isActive) {
+      if (!user.is_active) {
         return res.status(403).json({
           success: false,
           error: {
@@ -177,7 +156,7 @@ router.post('/login',
       }
 
       // Verify password
-      const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+      const isValidPassword = await verifyPassword(password, user.password_hash);
       if (!isValidPassword) {
         return res.status(401).json({
           success: false,
@@ -187,9 +166,6 @@ router.post('/login',
           }
         });
       }
-
-      // Update last activity
-      user.lastActivityAt = new Date().toISOString();
 
       // Generate tokens
       const { accessToken, refreshToken } = generateTokens(user.id, user.email);
@@ -201,12 +177,14 @@ router.post('/login',
           user: {
             id: user.id,
             email: user.email,
-            displayName: user.displayName,
+            displayName: user.display_name,
             role: user.role,
-            totalScore: user.totalScore,
-            riskScore: user.riskScore,
-            currentStreak: user.currentStreak,
-            longestStreak: user.longestStreak
+            totalScore: user.total_score,
+            riskScore: user.risk_score,
+            currentStreak: user.current_streak,
+            longestStreak: user.longest_streak,
+            lastActivityAt: user.last_activity_at,
+            createdAt: user.created_at
           },
           tokens: {
             accessToken,
@@ -257,15 +235,8 @@ router.post('/refresh',
       }
 
       // Find user
-      let user = null;
-      for (const u of users.values()) {
-        if (u.id === userId) {
-          user = u;
-          break;
-        }
-      }
-
-      if (!user || !user.isActive) {
+      const user = await getUserById(userId);
+      if (!user || !user.is_active) {
         return res.status(401).json({
           success: false,
           error: {
@@ -343,7 +314,25 @@ router.post('/logout',
 router.post('/logout-all',
   async (req, res) => {
     try {
-      // In production: delete all refresh tokens for this user
+      // Get user from auth middleware (attached to req)
+      const userId = req.user?.userId;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required'
+          }
+        });
+      }
+
+      // Remove all refresh tokens for this user
+      for (const [token, uid] of refreshTokens.entries()) {
+        if (uid === userId) {
+          refreshTokens.delete(token);
+        }
+      }
+
       res.json({
         success: true,
         data: {
@@ -389,16 +378,9 @@ router.get('/me',
         throw new Error('Invalid token type');
       }
 
-      // Find user
-      let user = null;
-      for (const u of users.values()) {
-        if (u.id === decoded.userId) {
-          user = u;
-          break;
-        }
-      }
-
-      if (!user || !user.isActive) {
+      // Find user in database
+      const user = await getUserById(decoded.userId);
+      if (!user || !user.is_active) {
         return res.status(401).json({
           success: false,
           error: {
@@ -414,14 +396,15 @@ router.get('/me',
           user: {
             id: user.id,
             email: user.email,
-            displayName: user.displayName,
+            displayName: user.display_name,
             role: user.role,
-            totalScore: user.totalScore,
-            riskScore: user.riskScore,
-            currentStreak: user.currentStreak,
-            longestStreak: user.longestStreak,
-            lastActivityAt: user.lastActivityAt,
-            createdAt: user.createdAt
+            totalScore: user.total_score,
+            riskScore: user.risk_score,
+            currentStreak: user.current_streak,
+            longestStreak: user.longest_streak,
+            lastActivityAt: user.last_activity_at,
+            createdAt: user.created_at,
+            updatedAt: user.updated_at
           }
         }
       });

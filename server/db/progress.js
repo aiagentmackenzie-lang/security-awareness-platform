@@ -1,251 +1,341 @@
 /**
- * Security Awareness Platform - Progress Persistence API
- * Database operations for user progress, scores, and attempts
+ * Progress Repository Layer
+ * Security Awareness Platform
+ * 
+ * Database operations for tracking user progress, attempts, and achievements
  */
 
-const { Pool } = require('pg');
-require('dotenv').config();
-
-// Database pool
-const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'security_awareness',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD
-});
-
-// Test connection
-pool.on('error', (err) => {
-  console.error('Unexpected database error:', err);
-});
+const { query, getClient } = require('./pool.js');
 
 /**
  * Save a scenario attempt
- * @param {Object} attempt - Attempt data
+ * @param {Object} attemptData - Attempt data
+ * @param {string} attemptData.userId - User UUID
+ * @param {string} attemptData.scenarioId - Scenario UUID
+ * @param {string[]} attemptData.selectedOptionIds - Selected options
+ * @param {boolean} attemptData.isCorrect - Whether answer was correct
+ * @param {number} attemptData.scoreDelta - Points earned
+ * @param {number} [attemptData.timeSpentSeconds] - Time spent
+ * @param {string} attemptData.riskCategory - Category of scenario
  * @returns {Promise<Object>} Saved attempt
  */
-async function saveAttempt(attempt) {
-  const query = `
-    INSERT INTO scenario_attempts (
-      user_id, scenario_id, selected_option_ids, is_correct, 
-      score_delta, time_spent_seconds, risk_category
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-    RETURNING *
-  `;
-  
-  const values = [
-    attempt.userId,
-    attempt.scenarioId,
-    attempt.selectedOptionIds,
-    attempt.isCorrect,
-    attempt.scoreDelta,
-    attempt.timeSpentSeconds,
-    attempt.riskCategory
-  ];
-
-  const result = await pool.query(query, values);
+async function saveAttempt({ userId, scenarioId, selectedOptionIds, isCorrect, scoreDelta, timeSpentSeconds = 0, riskCategory }) {
+  const result = await query(
+    `INSERT INTO scenario_attempts 
+     (user_id, scenario_id, selected_option_ids, is_correct, score_delta, time_spent_seconds, risk_category)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING *`,
+    [userId, scenarioId, selectedOptionIds, isCorrect, scoreDelta, timeSpentSeconds, riskCategory]
+  );
   return result.rows[0];
 }
 
 /**
- * Save a behavioral event
- * @param {Object} event - Event data
- * @returns {Promise<Object>} Saved event
+ * Get user's attempt history
+ * @param {string} userId - User UUID
+ * @param {Object} options - Query options
+ * @param {number} [options.limit=50] - Max results
+ * @param {number} [options.offset=0] - Offset for pagination
+ * @returns {Promise<Array>} Attempt history with scenario details
  */
-async function saveEvent(event) {
-  const query = `
-    INSERT INTO behavior_events (
-      user_id, scenario_id, event_type, option_id,
-      metadata, session_id, user_agent, ip_address
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    RETURNING *
-  `;
-
-  const values = [
-    event.userId,
-    event.scenarioId,
-    event.eventType,
-    event.optionId,
-    event.metadata ? JSON.stringify(event.metadata) : null,
-    event.sessionId,
-    event.userAgent,
-    event.ipAddress
-  ];
-
-  const result = await pool.query(query, values);
-  return result.rows[0];
-}
-
-/**
- * Update user score and stats
- * @param {string} userId - User ID
- * @param {Object} updates - Score updates
- * @returns {Promise<Object>} Updated user
- */
-async function updateUserScore(userId, updates) {
-  const query = `
-    UPDATE users
-    SET 
-      total_score = total_score + $2,
-      risk_score = GREATEST(0, LEAST(100, risk_score + $3)),
-      current_streak = $4,
-      longest_streak = GREATEST(longest_streak, $4),
-      last_activity_at = CURRENT_TIMESTAMP
-    WHERE id = $1
-    RETURNING *
-  `;
-
-  const values = [
-    userId,
-    updates.scoreDelta || 0,
-    updates.riskDelta || 0,
-    updates.newStreak || 0
-  ];
-
-  const result = await pool.query(query, values);
-  return result.rows[0];
-}
-
-/**
- * Award badges to user
- * @param {string} userId - User ID
- * @param {Array} badgeIds - Badge IDs to award
- */
-async function awardBadges(userId, badgeIds) {
-  const query = `
-    INSERT INTO user_badges (user_id, badge_id)
-    SELECT $1, id FROM badges WHERE badge_id = ANY($2)
-    ON CONFLICT DO NOTHING
-  `;
-
-  await pool.query(query, [userId, badgeIds]);
-}
-
-/**
- * Get user's earned badges
- * @param {string} userId - User ID
- * @returns {Promise<Array>} User's badges
- */
-async function getUserBadges(userId) {
-  const query = `
-    SELECT b.badge_id, b.name, b.description, b.icon, ub.earned_at
-    FROM user_badges ub
-    JOIN badges b ON ub.badge_id = b.id
-    WHERE ub.user_id = $1
-    ORDER BY ub.earned_at DESC
-  `;
-
-  const result = await pool.query(query, [userId]);
+async function getUserAttempts(userId, { limit = 50, offset = 0 } = {}) {
+  const result = await query(
+    `SELECT sa.*, s.title as scenario_title, s.type as scenario_type
+     FROM scenario_attempts sa
+     JOIN scenarios s ON sa.scenario_id = s.id
+     WHERE sa.user_id = $1
+     ORDER BY sa.created_at DESC
+     LIMIT $2 OFFSET $3`,
+    [userId, limit, offset]
+  );
   return result.rows;
 }
 
 /**
- * Get user's statistics
- * @param {string} userId - User ID
- * @returns {Promise<Object>} User stats
+ * Get user's total stats
+ * @param {string} userId - User UUID
+ * @returns {Promise<Object>} User statistics
  */
 async function getUserStats(userId) {
-  // Get basic user info
-  const userQuery = 'SELECT * FROM users WHERE id = $1';
-  const userResult = await pool.query(userQuery, [userId]);
-  const user = userResult.rows[0];
-
-  if (!user) return null;
-
-  // Get attempt counts
-  const attemptsQuery = `
-    SELECT 
+  // Total attempts and accuracy
+  const attemptsResult = await query(
+    `SELECT 
       COUNT(*) as total_attempts,
-      SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as correct_answers,
-      AVG(time_spent_seconds) as avg_time
-    FROM scenario_attempts
-    WHERE user_id = $1
-  `;
-  const attemptsResult = await pool.query(attemptsQuery, [userId]);
-
-  // Get category stats
-  const categoryQuery = `
-    SELECT 
+      COUNT(*) FILTER (WHERE is_correct = true) as correct_attempts,
+      AVG(score_delta) as avg_score,
+      SUM(time_spent_seconds) as total_time
+     FROM scenario_attempts
+     WHERE user_id = $1`,
+    [userId]
+  );
+  
+  const stats = attemptsResult.rows[0];
+  
+  // Category breakdown
+  const categoriesResult = await query(
+    `SELECT 
       risk_category,
-      COUNT(*) as total,
-      SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as correct
-    FROM scenario_attempts
-    WHERE user_id = $1
-    GROUP BY risk_category
-  `;
-  const categoryResult = await pool.query(categoryQuery, [userId]);
-
-  // Get report count
-  const reportsQuery = `
-    SELECT COUNT(*) as report_count
-    FROM behavior_events
-    WHERE user_id = $1 AND event_type = 'reported'
-  `;
-  const reportsResult = await pool.query(reportsQuery, [userId]);
-
+      COUNT(*) as attempts,
+      COUNT(*) FILTER (WHERE is_correct = true) as correct,
+      AVG(score_delta) as avg_score
+     FROM scenario_attempts
+     WHERE user_id = $1
+     GROUP BY risk_category`,
+    [userId]
+  );
+  
+  // Recent activity (last 30 days)
+  const activityResult = await query(
+    `SELECT 
+      DATE(created_at) as date,
+      COUNT(*) as attempts,
+      COUNT(*) FILTER (WHERE is_correct = true) as correct
+     FROM scenario_attempts
+     WHERE user_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '30 days'
+     GROUP BY DATE(created_at)
+     ORDER BY date DESC`,
+    [userId]
+  );
+  
+  // Calculate streak
+  const streakResult = await query(
+    `WITH daily_activity AS (
+      SELECT DISTINCT DATE(created_at) as activity_date
+      FROM scenario_attempts
+      WHERE user_id = $1
+      ORDER BY activity_date DESC
+    ),
+    streak_calc AS (
+      SELECT 
+        activity_date,
+        activity_date - (ROW_NUMBER() OVER (ORDER BY activity_date))::int AS streak_group
+      FROM daily_activity
+    )
+    SELECT COUNT(*) as current_streak
+    FROM streak_calc
+    WHERE streak_group = (SELECT streak_group FROM streak_calc ORDER BY activity_date DESC LIMIT 1)`,
+    [userId]
+  );
+  
   return {
-    user: {
-      id: user.id,
-      displayName: user.display_name,
-      totalScore: user.total_score,
-      currentStreak: user.current_streak,
-      longestStreak: user.longest_streak,
-      riskScore: user.risk_score,
-      joinedAt: user.created_at
-    },
-    progress: {
-      totalAttempts: parseInt(attemptsResult.rows[0]?.total_attempts) || 0,
-      correctAnswers: parseInt(attemptsResult.rows[0]?.correct_answers) || 0,
-      accuracy: attemptsResult.rows[0]?.total_attempts 
-        ? Math.round((attemptsResult.rows[0].correct_answers / attemptsResult.rows[0].total_attempts) * 100)
-        : 0,
-      avgTimeSeconds: Math.round(attemptsResult.rows[0]?.avg_time) || 0
-    },
-    categories: categoryResult.rows.reduce((acc, row) => {
-      acc[row.risk_category] = {
-        total: parseInt(row.total),
-        correct: parseInt(row.correct),
-        accuracy: Math.round((row.correct / row.total) * 100)
-      };
-      return acc;
-    }, {}),
-    reports: parseInt(reportsResult.rows[0]?.report_count) || 0
+    totalAttempts: parseInt(stats.total_attempts) || 0,
+    correctAttempts: parseInt(stats.correct_attempts) || 0,
+    accuracy: stats.total_attempts > 0 
+      ? Math.round((stats.correct_attempts / stats.total_attempts) * 100) 
+      : 0,
+    averageScore: Math.round(stats.avg_score) || 0,
+    totalTimeSpent: parseInt(stats.total_time) || 0,
+    currentStreak: parseInt(streakResult.rows[0]?.current_streak) || 0,
+    categories: categoriesResult.rows,
+    recentActivity: activityResult.rows
   };
 }
 
 /**
- * Get recent attempts
- * @param {string} userId - User ID
- * @param {number} limit - Number of results
+ * Get user's recent attempts (last N days)
+ * @param {string} userId - User UUID
+ * @param {number} [days=30] - Number of days
  * @returns {Promise<Array>} Recent attempts
  */
-async function getRecentAttempts(userId, limit = 10) {
-  const query = `
-    SELECT 
-      sa.scenario_id,
-      s.title,
-      sa.is_correct,
-      sa.score_delta,
-      sa.created_at
-    FROM scenario_attempts sa
-    JOIN scenarios s ON sa.scenario_id = s.id
-    WHERE sa.user_id = $1
-    ORDER BY sa.created_at DESC
-    LIMIT $2
-  `;
-
-  const result = await pool.query(query, [userId, limit]);
+async function getRecentAttempts(userId, days = 30) {
+  const result = await query(
+    `SELECT sa.*, s.title as scenario_title, s.type
+     FROM scenario_attempts sa
+     JOIN scenarios s ON sa.scenario_id = s.id
+     WHERE sa.user_id = $1 
+       AND sa.created_at >= CURRENT_DATE - INTERVAL '${days} days'
+     ORDER BY sa.created_at DESC`,
+    [userId]
+  );
   return result.rows;
+}
+
+/**
+ * Get weak categories for a user
+ * @param {string} userId - User UUID
+ * @returns {Promise<Array>} Categories with lowest accuracy
+ */
+async function getWeakCategories(userId) {
+  const result = await query(
+    `SELECT 
+      risk_category,
+      COUNT(*) as total_attempts,
+      COUNT(*) FILTER (WHERE is_correct = true) as correct_attempts,
+      CASE 
+        WHEN COUNT(*) > 0 
+        THEN ROUND((COUNT(*) FILTER (WHERE is_correct = true) * 100.0) / COUNT(*), 1)
+        ELSE 0
+      END as accuracy
+     FROM scenario_attempts
+     WHERE user_id = $1
+     GROUP BY risk_category
+     HAVING COUNT(*) >= 3
+     ORDER BY accuracy ASC
+     LIMIT 3`,
+    [userId]
+  );
+  return result.rows;
+}
+
+/**
+ * Get user's earned badges
+ * @param {string} userId - User UUID
+ * @returns {Promise<Array>} Badges with earned date
+ */
+async function getUserBadges(userId) {
+  const result = await query(
+    `SELECT b.*, ub.earned_at
+     FROM badges b
+     JOIN user_badges ub ON b.id = ub.badge_id
+     WHERE ub.user_id = $1
+     ORDER BY ub.earned_at DESC`,
+    [userId]
+  );
+  return result.rows;
+}
+
+/**
+ * Award a badge to user
+ * @param {string} userId - User UUID
+ * @param {string} badgeId - Badge UUID
+ * @returns {Promise<Object|null>} Awarded badge or null if already has it
+ */
+async function awardBadge(userId, badgeId) {
+  try {
+    const result = await query(
+      `INSERT INTO user_badges (user_id, badge_id)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, badge_id) DO NOTHING
+       RETURNING *`,
+      [userId, badgeId]
+    );
+    return result.rows[0] || null;
+  } catch (err) {
+    if (err.code === '23503') {
+      // Foreign key violation - badge doesn't exist
+      return null;
+    }
+    throw err;
+  }
+}
+
+/**
+ * Check if user has a badge
+ * @param {string} userId - User UUID
+ * @param {string} badgeId - Badge UUID
+ * @returns {Promise<boolean>}
+ */
+async function hasBadge(userId, badgeId) {
+  const result = await query(
+    `SELECT 1 FROM user_badges WHERE user_id = $1 AND badge_id = $2`,
+    [userId, badgeId]
+  );
+  return result.rows.length > 0;
+}
+
+/**
+ * Get global leaderboard
+ * @param {number} [limit=50] - Number of users
+ * @returns {Promise<Array>} Top users
+ */
+async function getGlobalLeaderboard(limit = 50) {
+  const result = await query(
+    `SELECT 
+      u.id,
+      u.display_name,
+      u.total_score,
+      u.longest_streak,
+      COUNT(DISTINCT sa.scenario_id) as scenarios_completed,
+      CASE 
+        WHEN COUNT(sa.id) > 0 
+        THEN ROUND((COUNT(*) FILTER (WHERE sa.is_correct = true) * 100.0) / COUNT(sa.id), 1)
+        ELSE 0
+      END as accuracy
+     FROM users u
+     LEFT JOIN scenario_attempts sa ON u.id = sa.user_id
+     WHERE u.is_active = true
+     GROUP BY u.id, u.display_name, u.total_score, u.longest_streak
+     ORDER BY u.total_score DESC, u.longest_streak DESC
+     LIMIT $1`,
+    [limit]
+  );
+  return result.rows;
+}
+
+/**
+ * Get category-specific leaderboard
+ * @param {string} category - Risk category
+ * @param {number} [limit=50] - Number of users
+ * @returns {Promise<Array>} Top users in category
+ */
+async function getCategoryLeaderboard(category, limit = 50) {
+  const result = await query(
+    `SELECT 
+      u.id,
+      u.display_name,
+      COUNT(*) as attempts,
+      COUNT(*) FILTER (WHERE sa.is_correct = true) as correct_attempts,
+      CASE 
+        WHEN COUNT(*) > 0 
+        THEN ROUND((COUNT(*) FILTER (WHERE sa.is_correct = true) * 100.0) / COUNT(*), 1)
+        ELSE 0
+      END as accuracy,
+      AVG(sa.score_delta) as avg_score
+     FROM users u
+     JOIN scenario_attempts sa ON u.id = sa.user_id
+     WHERE sa.risk_category = $1 AND u.is_active = true
+     GROUP BY u.id, u.display_name
+     HAVING COUNT(*) >= 5
+     ORDER BY accuracy DESC, AVG(sa.score_delta) DESC
+     LIMIT $2`,
+    [category, limit]
+  );
+  return result.rows;
+}
+
+/**
+ * Get dashboard data for a user
+ * @param {string} userId - User UUID
+ * @returns {Promise<Object>} Complete dashboard data
+ */
+async function getDashboardData(userId) {
+  const [stats, recentAttempts, weakCategories, badges, leaderboard] = await Promise.all([
+    getUserStats(userId),
+    getRecentAttempts(userId, 7),
+    getWeakCategories(userId),
+    getUserBadges(userId),
+    getGlobalLeaderboard(10)
+  ]);
+  
+  // Find user's rank
+  const userRankResult = await query(
+    `SELECT COUNT(*) + 1 as rank
+     FROM users
+     WHERE total_score > (SELECT total_score FROM users WHERE id = $1)
+       AND is_active = true`,
+    [userId]
+  );
+  
+  return {
+    stats,
+    recentAttempts,
+    weakCategories,
+    badges,
+    leaderboard,
+    userRank: parseInt(userRankResult.rows[0]?.rank) || null
+  };
 }
 
 module.exports = {
   saveAttempt,
-  saveEvent,
-  updateUserScore,
-  awardBadges,
-  getUserBadges,
+  getUserAttempts,
   getUserStats,
   getRecentAttempts,
-  pool
+  getWeakCategories,
+  getUserBadges,
+  awardBadge,
+  hasBadge,
+  getGlobalLeaderboard,
+  getCategoryLeaderboard,
+  getDashboardData
 };

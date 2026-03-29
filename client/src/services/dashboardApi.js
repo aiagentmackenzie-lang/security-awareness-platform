@@ -1,9 +1,16 @@
 /**
- * Static Dashboard API Service
- * For GitHub Pages deployment - uses localStorage instead of backend
+ * Dashboard API Service
+ * Security Awareness Platform
+ * 
+ * Uses real backend API with localStorage fallback for offline/GitHub Pages
  */
 
-// Static demo data
+import { api, isAuthenticated } from './api.js';
+
+const STORAGE_KEY = 'security-awareness-data';
+const USE_LOCAL = !import.meta.env.VITE_API_URL; // Use localStorage if no API URL
+
+// Demo data for fallback
 const DEMO_USER = {
   id: 'demo-user',
   displayName: 'Demo User',
@@ -29,43 +36,17 @@ const LEADERBOARD_DATA = [
   { rank: 5, userId: 'user-5', displayName: 'Newbie', score: 45, streak: 0, accuracy: 45, attempts: 5 }
 ];
 
-// Storage key
-const STORAGE_KEY = 'security-awareness-data';
-
 /**
- * Get stored data or initialize with defaults
+ * Get stored data from localStorage
  */
 function getStoredData() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
+    if (stored) return JSON.parse(stored);
   } catch (e) {
     console.error('Error reading localStorage:', e);
   }
-  
-  // Initialize with defaults
-  const defaultData = {
-    user: DEMO_USER,
-    badges: DEMO_BADGES,
-    attempts: [
-      { scenarioId: 'phish-002', title: 'CEO Wire Transfer Request', isCorrect: false, scoreDelta: -15, createdAt: '2024-03-29T10:00:00Z' },
-      { scenarioId: 'browse-001', title: 'HTTP Website', isCorrect: true, scoreDelta: 10, createdAt: '2024-03-29T09:45:00Z' },
-      { scenarioId: 'pwd-001', title: 'Create Strong Password', isCorrect: true, scoreDelta: 12, createdAt: '2024-03-29T09:30:00Z' },
-      { scenarioId: 'social-001', title: 'LinkedIn Invitation', isCorrect: true, scoreDelta: 8, createdAt: '2024-03-28T15:20:00Z' },
-      { scenarioId: 'phish-001', title: 'Mailbox Full Alert', isCorrect: false, scoreDelta: -10, createdAt: '2024-03-28T10:15:00Z' }
-    ],
-    categories: {
-      phishing: { completed: 3, total: 4, accuracy: 75 },
-      passwords: { completed: 3, total: 3, accuracy: 67 },
-      social_engineering: { completed: 3, total: 3, accuracy: 67 },
-      safe_browsing: { completed: 3, total: 4, accuracy: 50 }
-    }
-  };
-  
-  saveStoredData(defaultData);
-  return defaultData;
+  return null;
 }
 
 /**
@@ -80,21 +61,23 @@ function saveStoredData(data) {
 }
 
 /**
- * Simulate API delay
- */
-function delay(ms = 300) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
  * Get complete dashboard data
+ * Uses real API when authenticated, localStorage as fallback
  */
 export async function getDashboardData(userId = 'demo-user') {
-  await delay();
-  const data = getStoredData();
+  if (isAuthenticated()) {
+    try {
+      const response = await api.get(`/dashboard/user/${userId}`);
+      return response.data;
+    } catch (err) {
+      console.warn('API call failed, using localStorage:', err.message);
+    }
+  }
   
-  const totalAttempts = data.attempts.length;
-  const correctAttempts = data.attempts.filter(a => a.isCorrect).length;
+  // Fallback to localStorage
+  const data = getStoredData() || initializeDefaultData();
+  const totalAttempts = data.attempts?.length || 0;
+  const correctAttempts = data.attempts?.filter(a => a.isCorrect).length || 0;
   
   return {
     user: data.user,
@@ -108,7 +91,7 @@ export async function getDashboardData(userId = 'demo-user') {
     },
     categories: data.categories,
     badges: data.badges,
-    recentAttempts: data.attempts.slice(0, 10),
+    recentAttempts: (data.attempts || []).slice(0, 10),
     reports: 2
   };
 }
@@ -117,11 +100,18 @@ export async function getDashboardData(userId = 'demo-user') {
  * Get user statistics
  */
 export async function getUserStats(userId = 'demo-user') {
-  await delay();
-  const data = getStoredData();
+  if (isAuthenticated()) {
+    try {
+      const response = await api.get(`/dashboard/user/${userId}/stats`);
+      return response.data;
+    } catch (err) {
+      console.warn('API call failed, using localStorage:', err.message);
+    }
+  }
   
-  const totalAttempts = data.attempts.length;
-  const correctAttempts = data.attempts.filter(a => a.isCorrect).length;
+  const data = getStoredData() || initializeDefaultData();
+  const totalAttempts = data.attempts?.length || 0;
+  const correctAttempts = data.attempts?.filter(a => a.isCorrect).length || 0;
   
   return {
     user: data.user,
@@ -139,31 +129,52 @@ export async function getUserStats(userId = 'demo-user') {
  * Get user's badges
  */
 export async function getUserBadges(userId = 'demo-user') {
-  await delay();
-  const data = getStoredData();
-  return data.badges;
+  if (isAuthenticated()) {
+    try {
+      const response = await api.get(`/dashboard/user/${userId}/badges`);
+      return response.data;
+    } catch (err) {
+      console.warn('API call failed, using localStorage:', err.message);
+    }
+  }
+  
+  const data = getStoredData() || initializeDefaultData();
+  return data.badges || [];
 }
 
 /**
  * Get recent attempts
  */
 export async function getRecentAttempts(userId = 'demo-user', limit = 10) {
-  await delay();
-  const data = getStoredData();
-  return data.attempts.slice(0, limit);
+  if (isAuthenticated()) {
+    try {
+      const response = await api.get(`/dashboard/user/${userId}/attempts?limit=${limit}`);
+      return response.data;
+    } catch (err) {
+      console.warn('API call failed, using localStorage:', err.message);
+    }
+  }
+  
+  const data = getStoredData() || initializeDefaultData();
+  return (data.attempts || []).slice(0, limit);
 }
 
 /**
  * Get leaderboard
  */
 export async function getLeaderboard(category = 'overall', limit = 20) {
-  await delay(200);
+  if (isAuthenticated()) {
+    try {
+      const response = await api.get(`/dashboard/leaderboard?category=${category}&limit=${limit}`);
+      return response.data;
+    } catch (err) {
+      console.warn('API call failed, using localStorage:', err.message);
+    }
+  }
   
-  // Simulate category filtering
+  // Fallback leaderboard
   let leaderboard = [...LEADERBOARD_DATA];
-  
   if (category !== 'overall') {
-    // Shuffle slightly for variety in category views
     leaderboard = leaderboard.map((entry, i) => ({
       ...entry,
       score: Math.floor(entry.score * (0.8 + Math.random() * 0.4))
@@ -171,19 +182,23 @@ export async function getLeaderboard(category = 'overall', limit = 20) {
       .map((entry, i) => ({ ...entry, rank: i + 1 }));
   }
   
-  return {
-    category,
-    leaderboard: leaderboard.slice(0, limit)
-  };
+  return { category, leaderboard: leaderboard.slice(0, limit) };
 }
 
 /**
  * Get chart data
  */
 export async function getChartData(userId = 'demo-user', days = 30) {
-  await delay(300);
+  if (isAuthenticated()) {
+    try {
+      const response = await api.get(`/dashboard/charts/user/${userId}?days=${days}`);
+      return response.data;
+    } catch (err) {
+      console.warn('API call failed, using localStorage:', err.message);
+    }
+  }
   
-  const data = getStoredData();
+  const data = getStoredData() || initializeDefaultData();
   
   return {
     activity: [
@@ -195,7 +210,7 @@ export async function getChartData(userId = 'demo-user', days = 30) {
       { date: '2024-03-28', attempts: 2, correct: 1, accuracy: 50, points: -2 },
       { date: '2024-03-29', attempts: 3, correct: 2, accuracy: 67, points: 7 }
     ],
-    categories: Object.entries(data.categories).map(([cat, stats]) => ({
+    categories: Object.entries(data.categories || {}).map(([cat, stats]) => ({
       category: cat,
       total: stats.total,
       correct: Math.floor(stats.total * stats.accuracy / 100),
@@ -219,17 +234,25 @@ export async function getChartData(userId = 'demo-user', days = 30) {
  * Save a scenario attempt
  */
 export async function saveAttempt(attempt) {
-  const data = getStoredData();
+  if (isAuthenticated()) {
+    try {
+      // Attempt is already saved on the server during submission
+      return attempt;
+    } catch (err) {
+      console.warn('API call failed, using localStorage:', err.message);
+    }
+  }
+  
+  // Fallback: save to localStorage
+  const data = getStoredData() || initializeDefaultData();
   
   data.attempts.unshift({
     ...attempt,
     createdAt: new Date().toISOString()
   });
   
-  // Update user score
-  data.user.totalScore += attempt.scoreDelta || 0;
+  data.user.totalScore = (data.user.totalScore || 0) + (attempt.scoreDelta || 0);
   
-  // Update category stats
   if (attempt.riskCategory && data.categories[attempt.riskCategory]) {
     const cat = data.categories[attempt.riskCategory];
     cat.completed += 1;
@@ -241,6 +264,32 @@ export async function saveAttempt(attempt) {
   
   saveStoredData(data);
   return attempt;
+}
+
+/**
+ * Initialize default data
+ */
+function initializeDefaultData() {
+  const defaultData = {
+    user: DEMO_USER,
+    badges: DEMO_BADGES,
+    attempts: [
+      { scenarioId: 'phish-002', title: 'CEO Wire Transfer Request', isCorrect: false, scoreDelta: -15, createdAt: '2024-03-29T10:00:00Z' },
+      { scenarioId: 'browse-001', title: 'HTTP Website', isCorrect: true, scoreDelta: 10, createdAt: '2024-03-29T09:45:00Z' },
+      { scenarioId: 'pwd-001', title: 'Create Strong Password', isCorrect: true, scoreDelta: 12, createdAt: '2024-03-29T09:30:00Z' },
+      { scenarioId: 'social-001', title: 'LinkedIn Invitation', isCorrect: true, scoreDelta: 8, createdAt: '2024-03-28T15:20:00Z' },
+      { scenarioId: 'phish-001', title: 'Mailbox Full Alert', isCorrect: false, scoreDelta: -10, createdAt: '2024-03-28T10:15:00Z' }
+    ],
+    categories: {
+      phishing: { completed: 3, total: 4, accuracy: 75 },
+      passwords: { completed: 3, total: 3, accuracy: 67 },
+      social_engineering: { completed: 3, total: 3, accuracy: 67 },
+      safe_browsing: { completed: 3, total: 4, accuracy: 50 }
+    }
+  };
+  
+  saveStoredData(defaultData);
+  return defaultData;
 }
 
 /**

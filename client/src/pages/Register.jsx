@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { api, setTokens } from '../services/api.js';
 import './Auth.css';
 
 /**
@@ -43,33 +44,20 @@ export function Register() {
     }
 
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          displayName: formData.displayName,
-          email: formData.email,
-          password: formData.password
-        })
+      const data = await api.post('/auth/register', {
+        displayName: formData.displayName,
+        email: formData.email,
+        password: formData.password
       });
 
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error?.message || 'Registration failed');
-      }
-
       // Store tokens
-      localStorage.setItem('accessToken', data.data.tokens.accessToken);
-      localStorage.setItem('refreshToken', data.data.tokens.refreshToken);
-      localStorage.setItem('user', JSON.stringify(data.data.user));
+      setTokens(data.data.tokens.accessToken, data.data.tokens.refreshToken);
+      localStorage.setItem('user_data', JSON.stringify(data.data.user));
 
       // Redirect to dashboard
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
