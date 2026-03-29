@@ -1,10 +1,16 @@
 # Security Awareness Platform
 
-A comprehensive security awareness training application designed to help individuals and organizations identify and mitigate social engineering, phishing, and other cyber threats through interactive scenario-based learning.
+An open-source security awareness training application for everyone.
+
+**Learn. Practice. Stay Safe.**
+
+This platform helps individuals, students, educators, and organizations build practical skills in identifying and mitigating social engineering, phishing, and cyber threats through interactive, hands-on scenarios.
 
 ## Overview
 
-Security Awareness Platform provides hands-on training through realistic simulations across four critical security domains:
+Cybersecurity is for everyone. Whether you're a student, professional, teacher, or just curious — this platform gives you practical skills to protect yourself and others online.
+
+**No prior experience required.** Start with the basics and build confidence through realistic simulations across four essential security domains:
 
 - **Phishing Detection** — Identify suspicious emails, spoofed domains, and credential harvesting attempts
 - **Password Security** — Practice secure password creation and MFA best practices  
@@ -168,7 +174,22 @@ The hybrid architecture (AI + rule-based fallback) ensures the platform works re
 
 ## License
 
-Proprietary. All rights reserved.
+MIT License — Open source and free to use, modify, and distribute.
+
+This project is designed to be a resource for:
+- **Students** learning cybersecurity fundamentals
+- **Teachers** building security awareness curricula
+- **Companies** training employees on social engineering threats
+- **Communities** promoting digital safety
+
+**You are encouraged to:**
+- Fork and customize for your organization
+- Translate scenarios for your region
+- Add new scenario types and modules
+- Integrate with your LMS or training platform
+- Contribute improvements back to the community
+
+Knowledge about security threats should be freely accessible to everyone.
 
 ## Acknowledgments
 
