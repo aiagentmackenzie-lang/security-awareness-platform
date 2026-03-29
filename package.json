@@ -1,0 +1,47 @@
+{
+  "name": "security-awareness-platform",
+  "version": "1.0.0",
+  "description": "Gamified cybersecurity awareness and behavioral analytics platform",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "nodemon server/index.js",
+    "client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "test": "jest",
+    "db:migrate": "node db/migrate.js",
+    "db:seed": "node db/seed.js",
+    "start": "node index.js"
+  },
+  "keywords": [
+    "cybersecurity",
+    "security-awareness",
+    "phishing-simulation",
+    "training",
+    "gamification"
+  ],
+  "author": "Raphael",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.1.5",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "pg": "^8.11.3",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "express-validator": "^7.0.1",
+    "winston": "^3.11.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "concurrently": "^8.2.2",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,446 @@
+.leaderboard-page {
+  padding: var(--spacing-xl);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.leaderboard-header {
+  text-align: center;
+  margin-bottom: var(--spacing-xl);
+  padding-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.leaderboard-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: var(--spacing-sm);
+}
+
+.leaderboard-header p {
+  color: var(--color-text-muted);
+  font-size: 1.125rem;
+}
+
+/* Category Tabs */
+.category-tabs {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xl);
+  overflow-x: auto;
+  padding-bottom: var(--spacing-sm);
+}
+
+.category-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.category-tab:hover {
+  background: var(--color-surface-elevated);
+  border-color: var(--color-primary);
+}
+
+.category-tab.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
+.tab-icon {
+  font-size: 1.25rem;
+}
+
+/* User Standing Card */
+.user-standing-card {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark, #1d4ed8) 100%);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+  color: white;
+  box-shadow: var(--shadow-lg);
+}
+
+.standing-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-lg);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.standing-rank {
+  font-size: 2.5rem;
+  font-weight: 800;
+}
+
+.standing-info {
+  flex: 1;
+}
+
+.standing-name {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+}
+
+.standing-stats {
+  font-size: 0.875rem;
+  opacity: 0.9;
+}
+
+.standing-details {
+  display: flex;
+  gap: var(--spacing-xl);
+}
+
+.standing-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.standing-stat .stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.standing-stat .stat-label {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Leaderboard Table */
+.leaderboard-table-container {
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  margin-bottom: var(--spacing-xl);
+}
+
+.leaderboard-table {
+  width: 100%;
+}
+
+.table-header {
+  display: grid;
+  grid-template-columns: 80px 1fr 120px 100px 100px;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-surface-elevated);
+  border-bottom: 1px solid var(--color-border);
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.table-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 120px 100px 100px;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  transition: all 0.2s ease;
+}
+
+.table-row:last-child {
+  border-bottom: none;
+}
+
+.table-row:hover {
+  background: var(--color-surface-elevated);
+}
+
+.table-row.current-user {
+  background: rgba(59, 130, 246, 0.1);
+  border-left: 3px solid var(--color-primary);
+}
+
+/* Rank Styles */
+.rank-gold {
+  background: linear-gradient(90deg, rgba(251, 191, 36, 0.1) 0%, transparent 100%);
+}
+
+.rank-silver {
+  background: linear-gradient(90deg, rgba(156, 163, 175, 0.1) 0%, transparent 100%);
+}
+
+.rank-bronze {
+  background: linear-gradient(90deg, rgba(180, 83, 9, 0.1) 0%, transparent 100%);
+}
+
+.rank-top10 {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%);
+}
+
+.col-rank {
+  text-align: center;
+}
+
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.rank-gold .rank-badge {
+  background: #fbbf24;
+  color: #92400e;
+}
+
+.rank-silver .rank-badge {
+  background: #9ca3af;
+  color: #374151;
+}
+
+.rank-bronze .rank-badge {
+  background: #b45309;
+  color: #fef3c7;
+}
+
+/* User Column */
+.col-user {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  background: var(--color-primary);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.user-name {
+  font-weight: 500;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.you-badge {
+  background: var(--color-primary);
+  color: white;
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+}
+
+/* Stats Columns */
+.col-score {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.col-accuracy {
+  color: var(--color-text);
+}
+
+.col-streak {
+  text-align: center;
+}
+
+.streak-indicator {
+  color: #f59e0b;
+  font-weight: 500;
+}
+
+/* Climb Tips */
+.climb-tips {
+  padding-top: var(--spacing-xl);
+  border-top: 1px solid var(--color-border);
+}
+
+.climb-tips h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: var(--spacing-lg);
+  text-align: center;
+}
+
+.tips-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.tip-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.tip-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+.tip-icon {
+  font-size: 2rem;
+  margin-bottom: var(--spacing-sm);
+  display: block;
+}
+
+.tip-card h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
+  color: var(--color-text);
+}
+
+.tip-card p {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+/* Loading & Error States */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: var(--spacing-md);
+}
+
+.loading p {
+  color: var(--color-text-muted);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  text-align: center;
+  padding: var(--spacing-xl);
+}
+
+.error-icon {
+  font-size: 3rem;
+  margin-bottom: var(--spacing-md);
+}
+
+.error-title {
+  font-size: 1.5rem;
+  color: var(--color-danger);
+  margin-bottom: var(--spacing-sm);
+}
+
+.error-message {
+  color: var(--color-text-muted);
+  margin-bottom: var(--spacing-md);
+}
+
+.retry-button {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retry-button:hover {
+  background: var(--color-primary-dark);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .leaderboard-page {
+    padding: var(--spacing-md);
+  }
+
+  .category-tabs {
+    flex-wrap: nowrap;
+    overflow-x: scroll;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .category-tab {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .tab-label {
+    display: none;
+  }
+
+  .standing-details {
+    gap: var(--spacing-md);
+  }
+
+  .table-header,
+  .table-row {
+    grid-template-columns: 60px 1fr 80px;
+  }
+
+  .col-accuracy,
+  .col-streak {
+    display: none;
+  }
+
+  .tips-grid {
+    grid-template-columns: 1fr;
+  }
+}
