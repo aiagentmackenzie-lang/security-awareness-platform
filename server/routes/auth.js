@@ -19,15 +19,15 @@ const refreshTokens = new Map();
 /**
  * Generate JWT tokens
  */
-function generateTokens(userId, email) {
+function generateTokens(userId, email, role = 'learner') {
   const accessToken = jwt.sign(
-    { userId, email, type: 'access' },
+    { userId, email, role, type: 'access' },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN }
   );
 
   const refreshToken = jwt.sign(
-    { userId, type: 'refresh' },
+    { userId, role, type: 'refresh' },
     JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -62,8 +62,8 @@ router.post('/register',
       // Create user in database
       const user = await createUser({ email, password, displayName, role: 'learner' });
 
-      // Generate tokens
-      const { accessToken, refreshToken } = generateTokens(user.id, user.email);
+      // Generate tokens with role
+      const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role);
       refreshTokens.set(refreshToken, user.id);
 
       res.status(201).json({
@@ -167,8 +167,8 @@ router.post('/login',
         });
       }
 
-      // Generate tokens
-      const { accessToken, refreshToken } = generateTokens(user.id, user.email);
+      // Generate tokens with role
+      const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role);
       refreshTokens.set(refreshToken, user.id);
 
       res.json({
@@ -246,8 +246,8 @@ router.post('/refresh',
         });
       }
 
-      // Generate new tokens
-      const tokens = generateTokens(user.id, user.email);
+      // Generate new tokens with role
+      const tokens = generateTokens(user.id, user.email, user.role);
       refreshTokens.delete(refreshToken);
       refreshTokens.set(tokens.refreshToken, user.id);
 

@@ -1,6 +1,6 @@
 # Security Awareness Platform - Security Audit Report
-**Date:** March 29, 2026  
-**Scope:** GitHub Pages deployment (client/dist)
+**Date:** April 19, 2026  
+**Scope:** Full repository (client + server)
 
 ---
 
@@ -26,14 +26,14 @@ The static site is **SAFE** to deploy to GitHub Pages. No sensitive information 
 **Risk:** NONE - Public name is acceptable for portfolio
 
 ### 2. Placeholder Paths in Documentation
-**Location:** `DEPLOY.md`, `COMPLETION.md`  
-**Content:** `/Users/main/Security Apps/...`  
+**Location:** `DEPLOY.md`  
+**Content:** `/path/to/your/repo/...`  
 **Risk:** NONE - These are just documentation examples
 
 ### 3. JWT Secret Placeholder
-**Location:** `server/routes/auth.js`, `.env.example`  
-**Content:** `JWT_SECRET=your-secret-key-change-in-production`  
-**Risk:** NONE - This is a placeholder, actual .env file is gitignored
+**Location:** `server/routes/auth.js`, `server/.env.example`  
+**Content:** `JWT_SECRET=your_super_secret_jwt_key_change_this_in_production`  
+**Risk:** NONE - This is a placeholder, actual .env file is gitignored. All server files use a unified fallback value when env var is missing.
 
 ---
 
@@ -57,7 +57,8 @@ The static site is **SAFE** to deploy to GitHub Pages. No sensitive information 
 The following are NOT included in the GitHub Pages build:
 
 - `server/` - Entire backend directory
-- `.env` - Environment file (gitignored)
+- `server/.env` - Environment file (gitignored)
+- `.env` - Root environment file (gitignored)
 - `package-lock.json` - Dependency lock file
 - `docker-compose.yml` - Infrastructure config
 - `Dockerfile` - Container config
@@ -110,17 +111,26 @@ No sensitive information will be exposed.
 
 ---
 
-## Post-Deployment Security Note
+## Deployment Security Notes
 
-⚠️ **Important:** This is a **demo/portfolio version**. Data is stored in browser localStorage only:
-- No server-side persistence
-- No real authentication
+### Full-Stack Deployment (with backend)
+
+This application supports both a **demo mode** (localStorage only, no backend) and a **full-stack mode** with PostgreSQL and JWT authentication.
+
+For production deployments with the backend:
+- Generate a strong `JWT_SECRET` (64+ character random hex)
+- Use HTTPS with secure cookies
+- Set `NODE_ENV=production`
+- Restrict CORS origins via `CLIENT_URL`
+- Use a strong database password
+- Consider Redis for session storage instead of in-memory
+- Keep `server/.env` out of version control (gitignored)
+
+### Static Demo Mode (GitHub Pages)
+
+The client can be deployed as a standalone static site. In this mode:
+- All data is stored in browser localStorage
+- Authentication is simulated (no real backend)
 - Data can be cleared by users
-
-For a real deployment, you'd need:
-- Backend server with database
-- Proper authentication
-- HTTPS-only cookies
-- Environment-specific secrets
-
-**This version is perfect for showcasing your work publicly.**
+- AI features are unavailable
+- Perfect for showcasing the UI and scenarios publicly

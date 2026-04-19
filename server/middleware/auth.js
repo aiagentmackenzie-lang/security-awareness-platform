@@ -5,7 +5,7 @@
 
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production-64-characters-long';
 
 /**
  * Verify JWT token middleware
@@ -37,6 +37,12 @@ function authenticateToken(req, res, next) {
       });
     }
 
+    // Attach full user object (compatible with routes that use req.user)
+    req.user = {
+      userId: decoded.userId,
+      email: decoded.email,
+      role: decoded.role || 'learner'
+    };
     req.userId = decoded.userId;
     req.userEmail = decoded.email;
     next();
@@ -64,6 +70,11 @@ function optionalAuth(req, res, next) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
       if (decoded.type === 'access') {
+        req.user = {
+          userId: decoded.userId,
+          email: decoded.email,
+          role: decoded.role || 'learner'
+        };
         req.userId = decoded.userId;
         req.userEmail = decoded.email;
       }
@@ -80,7 +91,7 @@ function optionalAuth(req, res, next) {
  */
 function requireRole(...allowedRoles) {
   return (req, res, next) => {
-    if (!req.userId) {
+    if (!req.user?.userId) {
       return res.status(401).json({
         success: false,
         error: {
@@ -90,9 +101,7 @@ function requireRole(...allowedRoles) {
       });
     }
 
-    // In production: check user's role from database
-    // For now, we assume all authenticated users are 'learner'
-    const userRole = req.userRole || 'learner';
+    const userRole = req.user?.role || 'learner';
     
     if (!allowedRoles.includes(userRole)) {
       return res.status(403).json({

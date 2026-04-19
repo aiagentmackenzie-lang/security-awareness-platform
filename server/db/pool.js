@@ -7,17 +7,25 @@ const { Pool } = require('pg');
 require('dotenv').config();
 
 // Database configuration from environment variables
-const pool = new Pool({
+const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT) || 5432,
   database: process.env.DB_NAME || 'security_awareness',
   user: process.env.DB_USER || 'main',
-  password: process.env.DB_PASSWORD || '',
   // Connection pool settings
   max: 20, // Maximum number of connections
   idleTimeoutMillis: 30000, // Close idle connections after 30s
   connectionTimeoutMillis: 2000, // Return error after 2s if connection fails
-});
+};
+
+// Remove password if empty (avoids SASL auth errors)
+if (!process.env.DB_PASSWORD || process.env.DB_PASSWORD.trim() === '') {
+  // Don't set password at all - use trust auth
+} else {
+  dbConfig.password = process.env.DB_PASSWORD;
+}
+
+const pool = new Pool(dbConfig);
 
 // Test connection on startup
 pool.on('connect', () => {
@@ -29,20 +37,30 @@ pool.on('error', (err) => {
 });
 
 /**
- * Test database connection
+ * Test database connection with retry logic
+ * @param {number} maxRetries - Maximum number of connection attempts
+ * @param {number} retryDelayMs - Delay between retries in milliseconds
  * @returns {Promise<boolean>}
  */
-async function testConnection() {
-  try {
-    const client = await pool.connect();
-    const result = await client.query('SELECT NOW() as current_time');
-    console.log('✅ Database connected:', result.rows[0].current_time);
-    client.release();
-    return true;
-  } catch (err) {
-    console.error('❌ Database connection failed:', err.message);
-    return false;
+async function testConnection(maxRetries = 5, retryDelayMs = 3000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const client = await pool.connect();
+      const result = await client.query('SELECT NOW() as current_time');
+      console.log('✅ Database connected:', result.rows[0].current_time);
+      client.release();
+      return true;
+    } catch (err) {
+      console.error(`❌ Database connection attempt ${attempt}/${maxRetries} failed:`, err.message);
+      if (attempt === maxRetries) {
+        console.error('❌ All database connection attempts exhausted');
+        return false;
+      }
+      console.log(`⏳ Retrying in ${retryDelayMs}ms...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+    }
   }
+  return false;
 }
 
 /**

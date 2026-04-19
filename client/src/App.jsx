@@ -28,24 +28,6 @@ function ProtectedRoute({ children }) {
 }
 
 /**
- * Auth Route Component
- * Redirects to dashboard if already authenticated
- */
-function AuthRoute({ children }) {
-  const [auth, setAuth] = useState(null);
-  
-  useEffect(() => {
-    setAuth(isAuthenticated());
-  }, []);
-  
-  if (auth === null) {
-    return <div className="loading">Loading...</div>;
-  }
-  
-  return auth ? <Navigate to="/dashboard" replace /> : children;
-}
-
-/**
  * Navigation Component
  */
 function Navigation() {
@@ -123,12 +105,8 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/training" element={<Training />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
-            
-            {/* Auth Routes - redirect to dashboard if logged in */}
-            <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
-            <Route path="/register" element={<AuthRoute><Register /></AuthRoute>} />
-            
-            {/* Protected Routes - require authentication */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           </Routes>
         </main>

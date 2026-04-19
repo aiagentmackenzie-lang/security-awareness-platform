@@ -100,8 +100,10 @@ const scenarioRoutes = require('./routes/scenarios.js');
 const dashboardRoutes = require('./routes/dashboard.js');
 const aiRoutes = require('./routes/ai.js');
 
-// Wire routes
-app.use('/api/auth', authLimiter, authRoutes);
+// Wire routes - strict rate limit only on login/register
+app.use('/api/auth/login', authLimiter, authRoutes);
+app.use('/api/auth/register', authLimiter, authRoutes);
+app.use('/api/auth', authRoutes); // other auth routes (refresh, me, logout) use general limiter
 app.use('/api/scenarios', scenarioRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/ai', aiRoutes);

@@ -7,6 +7,29 @@
  */
 
 const { query } = require('./pool.js');
+const bcrypt = require('bcryptjs');
+
+// Demo users for testing
+const demoUsers = [
+  {
+    email: 'demo@example.com',
+    password: 'demo12345',
+    displayName: 'Demo User',
+    role: 'learner'
+  },
+  {
+    email: 'test@example.com', 
+    password: 'test12345',
+    displayName: 'Test User',
+    role: 'learner'
+  },
+  {
+    email: 'admin@example.com',
+    password: 'admin12345',
+    displayName: 'Admin User',
+    role: 'admin'
+  }
+];
 
 // 13 scenarios across 4 modules
 const scenarios = [
@@ -330,20 +353,68 @@ async function seedBadges() {
   console.log(`✅ Badges seeded successfully`);
 }
 
+async function seedUsers() {
+  console.log('\n🌱 Seeding demo users...');
+  
+  for (const user of demoUsers) {
+    // Check if user exists
+    const existing = await query(
+      'SELECT id FROM users WHERE email = $1',
+      [user.email]
+    );
+    
+    if (existing.rows.length > 0) {
+      console.log(`  ⏩ Skipping ${user.email} - already exists`);
+      continue;
+    }
+    
+    // Hash password
+    const passwordHash = await bcrypt.hash(user.password, 12);
+    
+    // Insert user
+    const userResult = await query(
+      `INSERT INTO users (email, password_hash, display_name, role, is_active)
+       VALUES ($1, $2, $3, $4, true)
+       RETURNING id`,
+      [user.email, passwordHash, user.displayName, user.role]
+    );
+    
+    const userId = userResult.rows[0].id;
+    
+    // Initialize risk profiles for all categories
+    const categories = ['phishing', 'passwords', 'social_engineering', 'safe_browsing'];
+    for (const category of categories) {
+      await query(
+        `INSERT INTO user_risk_profiles (user_id, category)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id, category) DO NOTHING`,
+        [userId, category]
+      );
+    }
+    
+    console.log(`  ✅ Created user: ${user.email} / Password: ${user.password}`);
+  }
+  
+  console.log(`✅ Users seeded successfully`);
+}
+
 async function seed() {
   console.log('\n🔧 Security Awareness Platform - Database Seeding\n');
   
   try {
     await seedScenarios();
     await seedBadges();
+    await seedUsers();
     
     // Show counts
     const scenarioCount = await query('SELECT COUNT(*) FROM scenarios');
     const badgeCount = await query('SELECT COUNT(*) FROM badges');
+    const userCount = await query('SELECT COUNT(*) FROM users');
     
     console.log('\n📊 Database seeded:');
     console.log(`   • Scenarios: ${scenarioCount.rows[0].count}`);
     console.log(`   • Badges: ${badgeCount.rows[0].count}`);
+    console.log(`   • Users: ${userCount.rows[0].count}`);
     console.log('\n✅ Seeding complete!\n');
     
     process.exit(0);
@@ -358,4 +429,4 @@ if (require.main === module) {
   seed();
 }
 
-module.exports = { seedScenarios, seedBadges };
+module.exports = { seedScenarios, seedBadges, seedUsers };

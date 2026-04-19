@@ -97,7 +97,7 @@ export function Login() {
         <div className="auth-footer">
           <p>Don't have an account? <Link to="/register">Sign up</Link></p>
           <p className="auth-demo">
-            <strong>Demo:</strong> Use any email with password "password123"
+            <strong>Demo:</strong> demo@example.com / demo12345
           </p>
         </div>
       </div>

@@ -9,13 +9,14 @@
 ### 1. Clone and Configure
 
 ```bash
-cd "/Users/main/Security Apps/security-awareness-platform"
+git clone https://github.com/aiagentmackenzie-lang/security-awareness-platform.git
+cd security-awareness-platform
 
 # Copy environment file
-cp .env.example .env
+cp server/.env.example server/.env
 
 # Edit configuration
-nano .env  # or vim, code, etc.
+nano server/.env  # or vim, code, etc.
 ```
 
 ### 2. Deploy

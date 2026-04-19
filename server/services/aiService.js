@@ -12,6 +12,27 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const rateLimitStore = new Map();
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 10;
+const RATE_LIMIT_CLEANUP_INTERVAL_MS = 300000; // 5 minutes cleanup interval
+
+/**
+ * Cleanup old entries from rate limit store to prevent memory leak
+ */
+function cleanupRateLimitStore() {
+  const now = Date.now();
+  for (const [userId, timestamps] of rateLimitStore.entries()) {
+    const recentRequests = timestamps.filter(timestamp => 
+      now - timestamp < RATE_LIMIT_WINDOW_MS
+    );
+    if (recentRequests.length === 0) {
+      rateLimitStore.delete(userId);
+    } else {
+      rateLimitStore.set(userId, recentRequests);
+    }
+  }
+}
+
+// Run cleanup every 5 minutes
+setInterval(cleanupRateLimitStore, RATE_LIMIT_CLEANUP_INTERVAL_MS);
 
 /**
  * Check rate limit for a user

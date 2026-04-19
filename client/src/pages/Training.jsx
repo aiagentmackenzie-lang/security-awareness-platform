@@ -57,9 +57,15 @@ export function Training() {
         filterType || recType,
         recDifficulty
       );
+      
+      if (!scenarioData) {
+        throw new Error('No scenarios available');
+      }
+      
       setScenario(scenarioData);
     } catch (err) {
-      setError(err.message);
+      console.error('Failed to load scenario:', err);
+      setError('Failed to load scenario. Please try again.');
     } finally {
       setLoading(false);
     }

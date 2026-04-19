@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getDashboardData, getChartData } from '../services/dashboardApi.js';
+import { getUser } from '../services/api.js';
 import './Dashboard.css';
-
-// const API_BASE_URL = 'http://localhost:3000/api';
 
 /**
  * Dashboard Page Component
@@ -14,7 +13,8 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const userId = 'demo-user'; // TODO: Get from auth context
+  const userData = getUser();
+  const userId = userData?.id || 'demo-user';
 
   useEffect(() => {
     async function loadDashboardData() {

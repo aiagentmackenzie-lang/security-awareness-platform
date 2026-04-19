@@ -34,7 +34,8 @@ function requireAuth(req, res, next) {
   const token = authHeader.substring(7);
   try {
     const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production-64-characters-long';
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch (err) {

@@ -6,7 +6,7 @@
  * with authentication, error handling, and retries.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Token storage
 let accessToken = localStorage.getItem('access_token') || null;
@@ -40,14 +40,44 @@ export function getAccessToken() {
 }
 
 /**
- * Check if user is authenticated
+ * Get stored user data from localStorage
  */
-export function isAuthenticated() {
-  return !!accessToken;
+export function getUser() {
+  const userData = localStorage.getItem('user_data');
+  return userData ? JSON.parse(userData) : null;
 }
 
 /**
- * Base fetch function with auth headers
+ * Check if user is authenticated and token is not expired
+ */
+export function isAuthenticated() {
+  if (!accessToken) return false;
+  try {
+    // Parse JWT payload
+    const payload = JSON.parse(atob(accessToken.split('.')[1]));
+    // Check if token is expired (exp is in seconds, Date.now() in milliseconds)
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      // Token expired, clear it
+      clearTokens();
+      return false;
+    }
+    // Also validate token has required fields
+    if (!payload.userId) {
+      clearTokens();
+      return false;
+    }
+    return true;
+  } catch {
+    // Invalid token format
+    clearTokens();
+    return false;
+  }
+}
+
+const REQUEST_TIMEOUT_MS = 30000; // 30 second timeout
+
+/**
+ * Base fetch function with auth headers and timeout
  */
 async function apiFetch(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -61,11 +91,18 @@ async function apiFetch(endpoint, options = {}) {
     headers['Authorization'] = `Bearer ${accessToken}`;
   }
   
+  // Create AbortController for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  
   try {
     const response = await fetch(url, {
       ...options,
-      headers
+      headers,
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     
     // Handle 401 - try to refresh token
     if (response.status === 401 && refreshToken) {
@@ -73,16 +110,24 @@ async function apiFetch(endpoint, options = {}) {
       if (refreshed) {
         // Retry original request with new token
         headers['Authorization'] = `Bearer ${accessToken}`;
+        const retryController = new AbortController();
+        const retryTimeoutId = setTimeout(() => retryController.abort(), REQUEST_TIMEOUT_MS);
         const retryResponse = await fetch(url, {
           ...options,
-          headers
+          headers,
+          signal: retryController.signal
         });
+        clearTimeout(retryTimeoutId);
         return handleResponse(retryResponse);
       }
     }
     
     return await handleResponse(response);
   } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout: The server took too long to respond');
+    }
     throw new Error(`Network error: ${error.message}`);
   }
 }

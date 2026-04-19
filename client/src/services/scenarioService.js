@@ -150,7 +150,7 @@ const scenarios = [
       { id: 'opt-10-1', option_id: 'a', label: 'Share the information - it\'s a job opportunity', is_correct: false },
       { id: 'opt-10-2', option_id: 'b', label: 'Report and block; verify through company website', is_correct: true },
       { id: 'opt-10-3', option_id: 'c', label: 'Give only your phone number', is_correct: false },
-      { id: 'opt-10-4', option_id: 'd', label: 'Ask them to send a formal offer first', is_correct: false }
+      { id: 'opt-10-4', option_id: 'd', label: 'Ask them to send a original offer first', is_correct: false }
     ]
   },
   // Safe Browsing scenarios
@@ -213,18 +213,50 @@ const scenarios = [
 ];
 
 /**
+ * Normalize scenario data to ensure correctOptionIds property exists
+ * @param {Object} scenario - Raw scenario data
+ * @returns {Object} Normalized scenario with correctOptionIds
+ */
+function normalizeScenario(scenario) {
+  if (!scenario) return null;
+  
+  // If options exist, compute correctOptionIds from is_correct field
+  if (scenario.options && Array.isArray(scenario.options)) {
+    const correctOptionIds = scenario.options
+      .filter(opt => opt.is_correct || opt.isCorrect)
+      .map(opt => opt.id);
+    
+    return {
+      ...scenario,
+      correctOptionIds
+    };
+  }
+  
+  return scenario;
+}
+
+/**
+ * Normalize array of scenarios
+ * @param {Array} scenarios - Array of raw scenario data
+ * @returns {Array} Normalized scenarios
+ */
+function normalizeScenarios(scenarios) {
+  return scenarios.map(normalizeScenario).filter(Boolean);
+}
+
+/**
  * Get all scenarios
  */
 export async function getAllScenarios() {
   if (isAuthenticated()) {
     try {
       const response = await api.get('/scenarios');
-      return response.data.data;
+      return normalizeScenarios(response.data);
     } catch (err) {
       console.warn('API call failed, using fallback:', err.message);
     }
   }
-  return scenarios;
+  return normalizeScenarios(scenarios);
 }
 
 /**
@@ -239,7 +271,7 @@ export async function getRandomScenario(type = null, difficulty = null) {
       if (type) params.append('type', type);
       if (difficulty) params.append('difficulty', difficulty);
       const response = await api.get(`/scenarios/next?${params}`);
-      return response.data.data;
+      return normalizeScenario(response.data);
     } catch (err) {
       console.warn('API call failed, using fallback:', err.message);
     }
@@ -256,7 +288,7 @@ export async function getRandomScenario(type = null, difficulty = null) {
   if (available.length === 0) {
     available = scenarios;
   }
-  return available[Math.floor(Math.random() * available.length)];
+  return normalizeScenario(available[Math.floor(Math.random() * available.length)]);
 }
 
 /**
@@ -267,13 +299,13 @@ export async function getScenarioById(id) {
   if (isAuthenticated()) {
     try {
       const response = await api.get(`/scenarios/${id}`);
-      return response.data.data;
+      return normalizeScenario(response.data);
     } catch (err) {
       console.warn('API call failed, using fallback:', err.message);
     }
   }
   
-  return scenarios.find(s => s.scenarioId === id || s.id === id) || null;
+  return normalizeScenario(scenarios.find(s => s.scenarioId === id || s.id === id) || null);
 }
 
 /**
@@ -289,7 +321,7 @@ export async function submitScenarioAnswer(scenarioId, selectedOptionIds, timeSp
         selectedOptionIds,
         timeSpentSeconds
       });
-      return response.data.data;
+      return response.data;
     } catch (err) {
       console.warn('API call failed, using fallback:', err.message);
     }
@@ -344,7 +376,7 @@ export async function getScenarioCounts() {
   if (isAuthenticated()) {
     try {
       const response = await api.get('/scenarios/counts');
-      return response.data.data;
+      return response.data;
     } catch (err) {
       console.warn('API call failed, using fallback:', err.message);
     }

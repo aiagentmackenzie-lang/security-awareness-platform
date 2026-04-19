@@ -71,27 +71,35 @@ git clone https://github.com/aiagentmackenzie-lang/security-awareness-platform.g
 cd security-awareness-platform
 
 # Install dependencies
-npm install
-cd client && npm install && cd ..
 cd server && npm install && cd ..
+cd client && npm install && cd ..
 
 # Configure environment
 cp server/.env.example server/.env
-# Edit server/.env with your database credentials
+# Edit server/.env — set DB credentials and generate a JWT_SECRET
+nano server/.env
 
-# Setup database
+# Setup database (PostgreSQL must be running)
 psql -U postgres -c "CREATE DATABASE security_awareness;"
-cd server && node db/migrate.js && node db/seed.js
+cd server && node db/migrate.js && node db/seed.js && cd ..
 
 # Start development servers
-# Terminal 1: Backend
+# Terminal 1: Backend (port 3000)
 cd server && npm run dev
 
-# Terminal 2: Frontend  
+# Terminal 2: Frontend (port 5173, proxies /api to backend)
 cd client && npm run dev
 ```
 
 Access the application at `http://localhost:5173`
+
+**Demo accounts** (after seeding):
+
+| Email | Password | Role |
+|-------|----------|------|
+| `demo@example.com` | `demo12345` | learner |
+| `test@example.com` | `test12345` | learner |
+| `admin@example.com` | `admin12345` | admin |
 
 ## API Documentation
 
